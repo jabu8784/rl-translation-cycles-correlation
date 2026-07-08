@@ -18,20 +18,35 @@ def plot_roundtrip(csv_path):
     pairs = [
         ("roundtrip_bleu", "bleu", "BLEU"),
         ("roundtrip_chrf", "chrf", "chrF"),
+        ("roundtrip_comet22", "comet22", "Comet-22"),
+        ("roundtrip_bleurt", "bleurt", "BLEURT"),
+        ("roundtrip_bertscore", "bertscore", "BERTScore"),
     ]
 
     for ax, (x_col, y_col, label) in zip(axes, pairs):
         mask = np.isfinite(df[x_col]) & np.isfinite(df[y_col])
         df = df[mask]
-        x = df[x_col].values
-        y = df[y_col].values
 
-        slope, intercept, r, p, se = stats.linregress(x, y)
-        r2 = r**2
+        # EDIT: ** operator wasn't working so I changed it to use the to_numpy method with dtype=float
+        
+        # x = df[x_col].values
+        # y = df[y_col].values
+        
+        # slope, intercept, r, p, es = stats.linregress(x, y)
+        # r2 = r ** 2
+
+        x = df[x_col].to_numpy(dtype=float)
+        y = df[y_col].to_numpy(dtype=float)
+
+        slope, intercept = np.polyfit(x, y, deg=1)
+
+        corr_matrix = np.corrcoef(x, y)
+        r_value = float(corr_matrix[0, 1])
+        r2 = r_value * r_value
 
         x_line = np.linspace(x.min(), x.max(), 200)
         y_line = slope * x_line + intercept
-
+        # ----------------------------
         ax.scatter(x, y, alpha=0.4, edgecolors="none", s=4)
         ax.plot(
             x_line,

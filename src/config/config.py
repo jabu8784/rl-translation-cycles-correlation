@@ -31,7 +31,7 @@ class ExperimentConfig:
     grpo_epsilon: float = (
         0.2  # Not used for now, used if doing multiple updates/rollout
     )
-    reward_metric: Literal["bleu", "chrf", "both"] = "both"
+    reward_metric: Literal["bleu", "chrf", "comet22", "bleurt", "bertscore", "both", "all"] = "both"
     grpo_num_backward: int = 1  # Number of backward translations (sampled)
     grpo_greedy_backward: bool = False
 

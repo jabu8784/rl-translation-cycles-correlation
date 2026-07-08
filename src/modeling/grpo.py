@@ -239,14 +239,25 @@ def compute_grpo_loss(
     advantages = (
         (rewards - rewards.mean(dim=-1, keepdim=True))
         / (rewards.std(dim=-1, keepdim=True).clamp(min=1e-8))
-    ).reshape(2, -1)  # (2,bs*gs)
-    if config.reward_metric == "bleu":
-        advantages = advantages[0]
-    elif config.reward_metric == "chrf":
-        advantages = advantages[1]
-    elif config.reward_metric == "both":
+    ).reshape(rewards.shape[0], -1)  # (2,bs*gs)
+    
+    metric_to_idx = {
+    "bleu": 0,
+    "chrf": 1,
+    "comet22": 2,
+    "bleurt": 3,
+    "bertscore": 4,
+}
+    if config.reward_metric in metric_to_idx:
+        advantages = advantages[metric_to_idx[config.reward_metric]]
+    elif config.reward_metric == "both":  # Just Bleu and ChrF
         # TODO: Right now just an unweighted mean, maybe want weighting factor
-        advantages = advantages.mean(dim=0)
+        advantages = advantages[[0, 1]].mean(dim=0)
+    elif config.reward_metric == "all":
+        # TODO: metrics are not normalized to same scale, so figure out how to combine them
+        raise NotImplementedError("Not implemented yet")
+    else:
+        raise ValueError(f"Unknown reward_metric: {config.reward_metric}")
 
     policy_ratio = torch.exp(policy_logprobs - old_logprobs)
     pg_loss_term = policy_ratio * advantages.unsqueeze(1)

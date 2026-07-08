@@ -79,7 +79,8 @@ def config_to_dataclass(config_path: str, overrides: list[str], dataclass_type):
     """
     parser = configparser.ConfigParser()
     parser.read(config_path)
-
+    read_files = parser.read(config_path)
+    
     if not parser.has_section("config"):
         raise ValueError(f"Config file {config_path} must have a [config] section")
 
