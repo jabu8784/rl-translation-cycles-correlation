@@ -30,3 +30,11 @@ data/*.json
 *.pickle
 .prime
 secrets.env
+
+# BLEURT checkpoint and source (large, downloaded separately)
+BLEURT/
+BLEURT-20/
+BLEURT-20.zip
+
+# macOS
+.DS_Store
