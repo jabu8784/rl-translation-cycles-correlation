@@ -103,7 +103,16 @@ def main() -> None:
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[dist_config.local_rank]
             )
+        #-------------TESTING----------------
+        total = sum(p.numel() for p in model.parameters())
+        trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+        logger.info(
+            "Translation model parameters: total=%d, requires_grad=%d",
+            total,
+            trainable,
+        )
+        #------------------------------------
         if config.eval_dataset == "breakend/nllb-multi-domain":
             dev_dataset = NLLBEvalDataset("dev", config)
             test_dataset = NLLBEvalDataset("test", config)

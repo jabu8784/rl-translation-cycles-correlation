@@ -34,12 +34,22 @@ def evaluate_correlation(
     gs = config.grpo_group_size
     loader = DataLoader(
         dataset,
-        batch_size=config.batch_size * config.grpo_group_size,
+        #batch_size=config.batch_size * config.grpo_group_size,
+        batch_size=config.batch_size,
         shuffle=False,
     )
     model.eval()
     metrics: dict[str, list[float]] = defaultdict(list)
     running_idx = 0
+
+    # (Scorer for certain metrics)
+    scorers = load_metric_scorers(
+        use_comet=config.reward_metric in ("comet22", "all"),
+        use_bleurt=config.reward_metric in ("bleurt", "all"),
+        use_bertscore=config.reward_metric in ("bertscore", "all"),
+        bleurt_checkpoint="BLEURT-20",
+    )
+
     for batch in tqdm(loader, desc="Evaluating", disable=not dist_config.is_main):
         eng_sentences = batch["eng"]
         tgt_sentences = batch["tgt"]
@@ -54,6 +64,9 @@ def evaluate_correlation(
             num_samples=gs,
             config=config,
         )
+        # Uncomment to see example forward translation
+        # logger.info("Example source: %s", eng_sentences[0])
+        # logger.info("Example forward candidates: %s", fwd_preds[0][:2])
         bwd_prompts = [
             make_backward_prompt(s, config) for group in fwd_preds for s in group
         ]
@@ -65,15 +78,17 @@ def evaluate_correlation(
             config=config,
         )
         bwd_preds = [bwd_preds[i * gs : (i + 1) * gs] for i in range(bs)]
+        # Uncomment to see example back-translation
+        # logger.info("Example back-translation: %s", bwd_preds[0])
 
         # Compute metrics
-        # (Scorer for certain metrics)
-        scorers = load_metric_scorers(
-            use_comet=True,
-            use_bleurt=True,
-            bleurt_checkpoint="BLEURT-20",
-        )
-        for metric in ["bleu", "chrf", "comet22", "bleurt", "bertscore"]:
+        if config.reward_metric == "both":
+            metric_list = ["bleu", "chrf"]
+        elif config.reward_metric == "all":
+            metric_list = ["bleu", "chrf", "comet22", "bleurt", "bertscore"]
+        else:
+            metric_list = [config.reward_metric]
+        for metric in metric_list:
             fwd_scores = torch.tensor(
                 [
                     compute_sentence_metric(
@@ -82,6 +97,7 @@ def evaluate_correlation(
                         metric,
                         sources=[eng_sentences[idx]] * gs,
                         scorers=scorers,
+                        bertscore_lang=config.language,
                     )
                     for idx in range(bs)
                 ]
@@ -102,6 +118,7 @@ def evaluate_correlation(
                             metric,
                             sources=fwd_preds[idx],
                             scorers=scorers,
+                            bertscore_lang="en",
                         )
                         for idx in range(bs)
                     ]

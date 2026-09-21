@@ -42,6 +42,14 @@ def sample_completions(
     prompt_len = inputs.input_ids.shape[1]
 
     log_mem("sample_completions_before_generate")
+    #------------------------------------ Checking for issues
+    logger.info(
+    "sample_completions: do_sample=True, temperature=%s, top_p=%s, top_k=%s",
+    config.grpo_temperature,
+    config.grpo_top_p,
+    config.grpo_top_k,
+    )
+    #------------------------------------- Delete later
     outputs = model.generate(
         **inputs,
         max_new_tokens=config.max_tokens,
@@ -95,12 +103,20 @@ def greedy_decode(
         truncation=False,
     ).to(model.device)
     prompt_len = inputs.input_ids.shape[1]
+    #------------------------------------ Checking for issues
+    logger.info(
+    "greedy_decode: do_sample=False, temperature=1.0, top_p=1.0, top_k=50"
+    )
+    #------------------------------------ Delete later 
     outputs = model.generate(
         **inputs,
         max_new_tokens=config.max_tokens
         if override_max_tokens is None
         else override_max_tokens,
         do_sample=False,
+        temperature=1.0,
+        top_p=1.0,
+        top_k=50,
         tokenizer=tokenizer,
         pad_token_id=tokenizer.eos_token_id,
         **({"stop_strings": [config.stop_string]} if config.stop_string else {}),

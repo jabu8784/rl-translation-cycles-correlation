@@ -15,9 +15,39 @@ class MetricScorers:
     bleurt: Optional[Any] = None
 
 
+# FLORES-style ISO 639-3 prefixes -> the ISO 639-1 codes bert_score expects
+_BERTSCORE_LANG_CODES = {
+    "eng": "en", "spa": "es", "fra": "fr", "deu": "de", "ita": "it",
+    "por": "pt", "zho": "zh", "ces": "cs", "est": "et", "fin": "fi", "lav": "lv",
+}
+_bertscorers: dict[tuple[str, str], Any] = {}
+
+
+def _bertscore_lang_code(lang: str) -> str:
+    """Map e.g. 'spa_Latn' -> 'es' (bert_score needs the 2-letter code)."""
+    prefix = lang.split("_")[0].lower()
+    return _BERTSCORE_LANG_CODES.get(prefix, prefix)
+
+
+def get_bertscorer(lang: str, device: str):
+    """Load a BERTScorer once per (language, device) and reuse it."""
+    from bert_score import BERTScorer
+
+    lang = _bertscore_lang_code(lang)
+    key = (lang, device)
+    if key not in _bertscorers:
+        logger.info("About to load BERTScore (%s)", lang)
+        _bertscorers[key] = BERTScorer(
+            lang=lang, rescale_with_baseline=True, device=device
+        )
+        logger.info("BERTScore loaded successfully")
+    return _bertscorers[key]
+
+
 def load_metric_scorers(
     use_comet: bool = True,
     use_bleurt: bool = True,
+    use_bertscore: bool = True,
     bleurt_checkpoint: str = "BLEURT-20",
 ) -> MetricScorers:
     scorers = MetricScorers()
@@ -26,12 +56,19 @@ def load_metric_scorers(
         from comet import download_model, load_from_checkpoint
 
         comet_path = download_model("Unbabel/wmt22-comet-da")
+        logger.info("About to load COMET")
         scorers.comet = load_from_checkpoint(comet_path)
+        logger.info("COMET loaded successfully")
 
     if use_bleurt:
         from bleurt import score
-
+        logger.info("About to load BLEURT")
         scorers.bleurt = score.BleurtScorer(bleurt_checkpoint)
+        logger.info("BLEURT loaded successfully")
+
+    if use_bertscore:
+        # Preload the English scorer (used for round-trip scoring)
+        get_bertscorer("en", "cuda" if torch.cuda.is_available() else "cpu")
 
     return scorers
 
@@ -43,6 +80,7 @@ def compute_sentence_metric(
     scorers: Optional[MetricScorers] = None,
     batch_size: int = 8,
     device: Optional[str] = None,
+    bertscore_lang: str = "en",
 ) -> list[float]:
     """Compute per-sentence BLEU or chrF scores.
 
@@ -107,20 +145,11 @@ def compute_sentence_metric(
             )
         ]
     if metric == "bertscore":
-        from bert_score import score as bert_score
-
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        P, R, f1 = bert_score(
-            predictions,
-            references,
-            lang="en",
-            rescale_with_baseline=True,
-            device=device,
-            batch_size=batch_size,
-        )
-        print(type(f1))
+        scorer = get_bertscorer(bertscore_lang, device)
+        _, _, f1 = scorer.score(predictions, references, batch_size=batch_size)
         F1 = cast(torch.Tensor, f1)
         
         return [float(x) for x in F1.detach().cpu().tolist()]
