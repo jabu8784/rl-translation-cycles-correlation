@@ -127,6 +127,10 @@ def compute_sentence_metric(
             data,
             batch_size=batch_size,
             gpus=1 if torch.cuda.is_available() else 0,
+            # COMET defaults to 2*gpus workers (0 without CUDA), but on Macs with MPS
+            # it also forces multiprocessing_context="fork", which PyTorch rejects
+            # when num_workers=0. Explicit workers avoids that.
+            num_workers=2,
         )
 
         # COMET versions differ slightly in return object shape.
