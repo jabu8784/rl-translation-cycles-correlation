@@ -38,3 +38,6 @@ BLEURT-20.zip
 
 # macOS
 .DS_Store
+
+# Correlation-mode output (written as <language>_metrics.csv)
+*_metrics.csv

@@ -2,14 +2,14 @@
 #SBATCH --gres=gpu:h100_80gb
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=8000m
+#SBATCH --mem=32GB
 #SBATCH --time=4-00:00:00
 #SBATCH --output=logs/%j.log
 #SBATCH --job-name=rltc
-#SBATCH --partition=blanca-clearlab1
-#SBATCH --account=blanca-clearlab1
-#SBATCH --qos=blanca-clearlab1
-#SBATCH --mail-user=michael.ginn@colorado.edu
+#SBATCH --partition=blanca-clearlab2
+#SBATCH --account=blanca-clearlab2
+#SBATCH --qos=blanca-clearlab2
+#SBATCH --mail-user=jacob.burton-1@colorado.edu
 #SBATCH --mail-type=ALL
 
 # module load cuda/12.1.1
@@ -17,8 +17,10 @@
 # module load miniforge
 # mamba activate flash_env
 module load uv
+export HF_HOME=/projects/$USER/.cache/huggingface
+export UV_CACHE_DIR=/projects/$USER/.cache/uv
 uv sync
-uv pip install flash-attn setuptools --no-build-isolation
+
 
 export PYTORCH_ALLOC_CON=expandable_segments:True
 
