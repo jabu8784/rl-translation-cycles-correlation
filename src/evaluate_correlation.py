@@ -88,20 +88,23 @@ def evaluate_correlation(
             metric_list = ["bleu", "chrf", "comet22", "bleurt", "bertscore"]
         else:
             metric_list = [config.reward_metric]
+        # Flatten the bs x gs groups so each metric is scored in one call per
+        # batch (COMET pays ~1s of setup per predict() call), then reshape.
+        flat_fwd_preds = [s for group in fwd_preds for s in group]
+        flat_bwd_preds = [s for group in bwd_preds for s in group]
+        flat_eng = [s for s in eng_sentences for _ in range(gs)]
+        flat_tgt = [s for s in tgt_sentences for _ in range(gs)]
         for metric in metric_list:
             fwd_scores = torch.tensor(
-                [
-                    compute_sentence_metric(
-                        fwd_preds[idx],
-                        [tgt_sentences[idx]] * gs,
-                        metric,
-                        sources=[eng_sentences[idx]] * gs,
-                        scorers=scorers,
-                        bertscore_lang=config.language,
-                    )
-                    for idx in range(bs)
-                ]
-            )
+                compute_sentence_metric(
+                    flat_fwd_preds,
+                    flat_tgt,
+                    metric,
+                    sources=flat_eng,
+                    scorers=scorers,
+                    bertscore_lang=config.language,
+                )
+            ).reshape(bs, gs)
             # Normalize fwd sentence score
             fwd_scores_norm = (
                 fwd_scores - fwd_scores.mean(dim=-1, keepdim=True)
@@ -109,33 +112,17 @@ def evaluate_correlation(
             fwd_scores_norm = fwd_scores_norm.reshape(bs * gs).tolist()
             # Store fwd scores
             metrics[metric].extend(fwd_scores_norm)
-            if metric == "comet22":
-                round_trip_scores = torch.tensor(
-                    [
-                        compute_sentence_metric(
-                            bwd_preds[idx],
-                            [eng_sentences[idx]] * gs,
-                            metric,
-                            sources=fwd_preds[idx],
-                            scorers=scorers,
-                            bertscore_lang="en",
-                        )
-                        for idx in range(bs)
-                    ]
+            # COMET scores the back-translation against its forward source
+            round_trip_scores = torch.tensor(
+                compute_sentence_metric(
+                    flat_bwd_preds,
+                    flat_eng,
+                    metric,
+                    sources=flat_fwd_preds if metric == "comet22" else flat_eng,
+                    scorers=scorers,
+                    bertscore_lang="en",
                 )
-            else:
-                round_trip_scores = torch.tensor(
-                    [
-                        compute_sentence_metric(
-                            bwd_preds[idx],
-                            [eng_sentences[idx]] * gs,
-                            metric,
-                            sources=[eng_sentences[idx]] * gs,
-                            scorers=scorers,
-                        )
-                        for idx in range(bs)
-                    ]
-                )
+            ).reshape(bs, gs)
             # Normalize round trip scores
             round_trip_scores_norm = (
                 round_trip_scores - round_trip_scores.mean(dim=-1, keepdim=True)
