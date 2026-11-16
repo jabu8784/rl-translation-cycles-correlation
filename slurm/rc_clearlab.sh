@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --gres=gpu:h100_80gb
+#SBATCH --gres=gpu:l40:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=32GB
@@ -20,12 +20,14 @@ module load uv
 export HF_HOME=/projects/$USER/.cache/huggingface
 export UV_CACHE_DIR=/projects/$USER/.cache/uv
 uv sync
-
+# COMET needs transformers<5, which conflicts with pyproject.toml, so install
+# the metric packages on top and skip uv run's auto-sync (it would undo this).
+uv pip install unbabel-comet bert-score
 
 export PYTORCH_ALLOC_CON=expandable_segments:True
 
 echo "=== CUDA + PyTorch diagnostics ==="
-uv run python - <<'PY'
+uv run --no-sync python - <<'PY'
 import torch, os
 print("CUDA visible devices:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 print("Torch CUDA version:", torch.version.cuda)
@@ -36,4 +38,4 @@ if torch.cuda.is_available():
     print("GPU 0:", torch.cuda.get_device_name(0))
 PY
 
-uv run python run.py "$1" "${@:2}"
+uv run --no-sync python run.py "$1" "${@:2}"
