@@ -61,7 +61,12 @@ def load_metric_scorers(
         logger.info("COMET loaded successfully")
 
     if use_bleurt:
+        import tensorflow as tf
         from bleurt import score
+
+        # Pip TensorFlow can't build GPU kernels on some cluster GPUs (no ptxas,
+        # driver rejects its PTX), so keep BLEURT on CPU; torch keeps the GPU.
+        tf.config.set_visible_devices([], "GPU")
         logger.info("About to load BLEURT")
         scorers.bleurt = score.BleurtScorer(bleurt_checkpoint)
         logger.info("BLEURT loaded successfully")
