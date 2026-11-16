@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --gres=gpu:l40:1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=32GB
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=48GB
 #SBATCH --time=4-00:00:00
 #SBATCH --output=logs/%j.log
 #SBATCH --job-name=rltc
@@ -19,10 +19,12 @@
 module load uv
 export HF_HOME=/projects/$USER/.cache/huggingface
 export UV_CACHE_DIR=/projects/$USER/.cache/uv
+export TF_FORCE_GPU_ALLOW_GROWTH=true
 uv sync
 # COMET needs transformers<5, which conflicts with pyproject.toml, so install
 # the metric packages on top and skip uv run's auto-sync (it would undo this).
 uv pip install unbabel-comet bert-score
+uv pip install "git+https://github.com/google-research/bleurt.git"
 
 export PYTORCH_ALLOC_CON=expandable_segments:True
 
