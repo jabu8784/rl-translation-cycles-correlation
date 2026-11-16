@@ -68,7 +68,9 @@ def load_metric_scorers(
         # driver rejects its PTX), so keep BLEURT on CPU; torch keeps the GPU.
         tf.config.set_visible_devices([], "GPU")
         logger.info("About to load BLEURT")
-        scorers.bleurt = score.BleurtScorer(bleurt_checkpoint)
+        # Length batching trims padding to each batch's longest pair instead of
+        # 512 tokens: same scores, ~15x faster on CPU for FLORES-length sentences.
+        scorers.bleurt = score.LengthBatchingBleurtScorer(bleurt_checkpoint)
         logger.info("BLEURT loaded successfully")
 
     if use_bertscore:
